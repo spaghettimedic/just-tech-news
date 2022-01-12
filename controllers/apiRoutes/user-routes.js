@@ -63,23 +63,31 @@ router.post('/', (req, res) => {
     email: req.body.email,
     password: req.body.password
   })
-  .then(dbUserData => res.json(dbUserData))
+  .then(dbUserData => {
+    req.session.save(() => {
+      req.session.user_id = dbUserData.id;
+      req.session.username = dbUserData.username;
+      req.session.loggedIn = true;
+
+      res.json(dbUserData);
+    });
+  })
   .catch(err => {
     console.log(err);
     res.status(500).json(err);
   });
 });
 
-// authentication -- decided to use username instead of email like the module did because I also decided to use 'unique' constraint on username
+// authentication 
 router.post('/login', (req, res) => {
-  // expects {username: 'lernantino', password: 'password1234'}
+  // expects {email: 'lernantino@gmail.com', password: 'password1234'}
   User.findOne({
     where: {
-      username: req.body.username
+      email: req.body.email
     }
   }).then(dbUserData => {
     if (!dbUserData) {
-      res.status(400).json({ message: 'That user name was not found!' });
+      res.status(400).json({ message: 'That email was not found!' });
       return;
     }
     // verify user
@@ -88,7 +96,15 @@ router.post('/login', (req, res) => {
       res.status(400).json({ message: 'Incorrect password!' });
       return;
     }
-    res.json({ user: dbUserData, message: 'You are now logged in!' });
+    
+    req.session.save(() => {
+      // declare session variables
+      req.session.user_id = dbUserData.id;
+      req.session.username = dbUserData.username;
+      req.session.loggedIn = true;
+      
+      res.json({ user: dbUserData, message: 'You are now logged in!' });
+    })
   });
 });
 
@@ -134,6 +150,17 @@ router.delete('/:id', (req, res) => {
     console.log(err);
     res.status(500).json(err);
   });
+});
+
+// destroy session route to logout
+router.post('/logout', (req, res) => {
+  if (req.session.loggedIn) {
+    req.session.destroy(() => {
+      res.status(204).end();
+    });
+  } else {
+    res.status(404).end();
+  }
 });
 
 module.exports = router;
